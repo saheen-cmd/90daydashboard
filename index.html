@@ -157,6 +157,19 @@
   @media(max-width:820px){.app{grid-template-columns:1fr}.sidebar{position:static;height:auto;flex-direction:row;flex-wrap:wrap}
     .nav{display:flex;flex-wrap:wrap;gap:4px}.navlabel,.side-foot{display:none}.kpis{grid-template-columns:repeat(2,1fr)}
     .topbar{flex-direction:column;align-items:flex-start}.content{padding:18px}}
+
+  /* api-bar */
+  .api-bar{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 18px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;
+    box-shadow:var(--shadow);margin-bottom:18px}
+  .api-bar.connected{border-color:var(--green-200);background:#f6fbf8}
+  .api-left{display:flex;align-items:center;gap:12px;flex:0 0 auto}
+  .api-title{font-weight:700;font-size:13.5px}
+  .api-hint{font-size:11.5px;color:var(--muted)}
+  .api-right{display:flex;gap:8px;align-items:center;flex:1;min-width:0}
+  .api-right input{flex:1;font-family:inherit;font-size:12.5px;padding:9px 11px;
+    border:1px solid var(--line);border-radius:9px;background:var(--panel-2);min-width:0}
+  .api-right input:focus{outline:none;border-color:var(--green-500);background:#fff}
 </style>
 </head>
 <body>
@@ -198,18 +211,24 @@
       </div>
     </div>
 
-    <!-- SETUP screen (shown if no API URL) -->
-    <div id="setup" class="center-msg" style="display:none">
-      <div class="box">
-        <h2>Connect your sheet</h2>
-        <p style="color:var(--muted)">Paste the Apps Script Web App URL (ends in <code>/exec</code>). Deploy <b>Code.gs</b> as a Web App — Execute as <b>Me</b>, access <b>Anyone</b>.</p>
-        <input id="apiInput" placeholder="https://script.google.com/macros/s/AKfycb.../exec" />
-        <button class="btn primary" id="apiSave" style="width:100%;justify-content:center">Connect</button>
-      </div>
-    </div>
-
     <!-- DASHBOARD -->
-    <div id="dash" class="content" style="display:none">
+    <div id="dash" class="content">
+
+      <!-- API connection bar — always visible -->
+      <div class="api-bar" id="apiBar">
+        <div class="api-left">
+          <span style="font-size:22px">⚡</span>
+          <div>
+            <div class="api-title">Sheet Connection</div>
+            <div class="api-hint">Paste your Apps Script Web App URL (ends in <code>/exec</code>)</div>
+          </div>
+        </div>
+        <div class="api-right">
+          <input id="apiInput" placeholder="https://script.google.com/macros/s/AKfycb…/exec" />
+          <button class="btn primary" id="apiSave">Connect</button>
+        </div>
+      </div>
+
       <div class="err-banner" id="errBanner"></div>
 
       <!-- filters -->
@@ -500,7 +519,7 @@ function drawDeptChart(rows){
    ============================================================ */
 async function load(initial){
   const url=getApi();
-  if(!url){ showSetup(); return; }
+  if(!url){ showErrNeedUrl(); return; }
   setSync('loading');
   try{
     const json=await jsonp(url);            // JSONP avoids CORS entirely
@@ -574,13 +593,28 @@ function setSync(state,json){
   }
 }
 
-/* ---- setup screen ---- */
-function showSetup(){ $('#setup').style.display='grid'; $('#dash').style.display='none'; }
-function showDash(){ $('#setup').style.display='none'; $('#dash').style.display='block'; }
 
 /* ============================================================
    WIRING
    ============================================================ */
+
+function showErrNeedUrl(){
+  const b=$('#errBanner'); b.style.display='block';
+  b.textContent='No URL set — paste your /exec URL in the connection bar above and click Connect.';
+}
+function updateApiBarState(){
+  const url=getApi();
+  const bar=$('#apiBar');
+  if(url){
+    bar.classList.add('connected');
+    // show truncated URL as placeholder so user knows what's set
+    $('#apiInput').placeholder=url.length>60?url.slice(0,57)+'…':url;
+    $('#apiInput').title=url;
+  } else {
+    bar.classList.remove('connected');
+    $('#apiInput').placeholder='https://script.google.com/macros/s/AKfycb…/exec';
+  }
+}
 function init(){
   $('#todayChip').textContent=fmt.format(new Date());
 
@@ -588,9 +622,9 @@ function init(){
   $('#apiSave').onclick=()=>{
     const v=$('#apiInput').value.trim();
     if(!/\/exec($|\?)/.test(v)){ alert('That URL should end in /exec'); return; }
-    localStorage.setItem('probation_api',v); showDash(); load(true);
+    localStorage.setItem('probation_api',v); load(true);
   };
-  $('#navConfig').onclick=()=>{ localStorage.removeItem('probation_api'); $('#apiInput').value=getApi(); showSetup(); };
+  $('#navConfig').onclick=()=>{ localStorage.removeItem('probation_api'); $('#apiInput').value=''; updateApiBarState(); };
 
   // filter events
   ['fStage','fDept','fFrom','fTo'].forEach(id=>$('#'+id).addEventListener('change',()=>{
@@ -618,7 +652,9 @@ function init(){
     $('#'+a.dataset.scroll).scrollIntoView({behavior:'smooth',block:'start'});
   });
 
-  if(getApi()) showDash(); else showSetup();
+  // pre-fill the URL input from storage
+  $('#apiInput').value=getApi();
+  updateApiBarState();
   load(true);
   setInterval(()=>{ if(getApi()) load(false); }, POLL_MS);
 }
