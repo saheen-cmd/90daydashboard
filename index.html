@@ -52,7 +52,7 @@
   .dot.err{background:#c8503e;animation:none}
   @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(63,122,87,.5)}70%{box-shadow:0 0 0 7px rgba(63,122,87,0)}100%{box-shadow:0 0 0 0 rgba(63,122,87,0)}}
 
-  /* ---------- mai ---------- */
+  /* ---------- main ---------- */
   .main{padding:0;min-width:0}
   .topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;
     padding:26px 34px 18px;border-bottom:1px solid var(--line);background:var(--paper);position:sticky;top:0;z-index:20}
@@ -379,7 +379,7 @@ function funnelData(fromD, toD, deptFilter){
 }
 
 /* ============================================================
-   RENDE
+   RENDER
    ============================================================ */
 function currentFilters(){
   return {
@@ -503,9 +503,7 @@ async function load(initial){
   if(!url){ showSetup(); return; }
   setSync('loading');
   try{
-    const res=await fetch(url+(url.includes('?')?'&':'?')+'t='+Date.now());
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const json=await res.json();
+    const json=await jsonp(url);            // JSONP avoids CORS entirely
     if(!json.ok) throw new Error(json.error||'Backend error');
     DATA=json.employees||[];
     $('#errBanner').style.display='none';
@@ -515,8 +513,26 @@ async function load(initial){
   }catch(err){
     setSync('err');
     const b=$('#errBanner'); b.style.display='block';
-    b.textContent='Could not reach the sheet: '+err.message+'.  Check the Web App URL (must end in /exec) and that access = Anyone.';
+    b.textContent='Could not reach the sheet ('+err.message+'). '
+      +'Open the /exec URL in an incognito tab: if you see JSON it is a deploy issue '
+      +'(redeploy a NEW version, access = Anyone); if it asks you to sign in, the app is not public yet.';
   }
+}
+
+/* Loads the Web App via a <script> tag so the browser never does a
+   cross-origin fetch — sidesteps the "Failed to fetch" CORS error. */
+function jsonp(url){
+  return new Promise((resolve,reject)=>{
+    const cb='__probcb'+Math.floor(Math.random()*1e9);
+    const sep=url.includes('?')?'&':'?';
+    const s=document.createElement('script');
+    const timer=setTimeout(()=>{cleanup();reject(new Error('timeout / wrong URL'));},15000);
+    function cleanup(){clearTimeout(timer);try{delete window[cb];}catch(_){}s.remove();}
+    window[cb]=data=>{cleanup();resolve(data);};
+    s.onerror=()=>{cleanup();reject(new Error('script blocked'));};
+    s.src=url+sep+'callback='+cb+'&t='+Date.now();
+    document.body.appendChild(s);
+  });
 }
 
 function buildFilters(json){
