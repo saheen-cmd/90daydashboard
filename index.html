@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Probation Review Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --paper:#f3f1ea; --panel:#ffffff; --panel-2:#faf9f4;
+    --ink:#16201a; --muted:#6b756d; --line:#e4e1d6;
+    --green-950:#0f1f16; --green-900:#15291d; --green-800:#1d3a2a;
+    --green-600:#2f6b48; --green-500:#3f7a57; --green-200:#cfe3d6;
+    --gold:#b08531; --gold-soft:#f3e9d2;
+    --danger:#b23a2b; --danger-soft:#f6ddd6;
+    --shadow:0 1px 2px rgba(20,40,28,.04),0 8px 24px rgba(20,40,28,.06);
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:'Hanken Grotesk',system-ui,sans-serif;
+    background:var(--paper); color:var(--ink);
+    -webkit-font-smoothing:antialiased; font-size:14px; line-height:1.45;
+  }
+  .num,.display{font-family:'Fraunces',Georgia,serif;font-variant-numeric:tabular-nums}
+
+  /* ---------- shell ---------- */
+  .app{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
+  .sidebar{
+    background:var(--green-950);color:#dfe8e0;padding:24px 18px;
+    position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:6px
+  }
+  .brand{display:flex;align-items:center;gap:11px;margin-bottom:30px;padding:2px 6px}
+  .brand .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--green-500),var(--green-800));
+    display:grid;place-items:center;font-family:'Fraunces';font-weight:700;color:#fff;font-size:18px}
+  .brand b{font-size:16px;color:#fff;font-weight:600;letter-spacing:.2px}
+  .brand small{display:block;color:#7e9686;font-size:11px;font-weight:500;margin-top:1px}
+  .navlabel{font-size:10.5px;letter-spacing:.14em;color:#5f7568;text-transform:uppercase;margin:18px 8px 6px;font-weight:600}
+  .nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:#bcccc0;
+    text-decoration:none;font-weight:500;cursor:pointer;transition:.15s;font-size:13.5px}
+  .nav a:hover{background:#1a3325;color:#fff}
+  .nav a.active{background:var(--green-800);color:#fff}
+  .nav a .ic{width:16px;text-align:center;opacity:.9}
+  .side-foot{margin-top:auto;font-size:11px;color:#5f7568;padding:10px 8px;border-top:1px solid #1d3527}
+  .syncrow{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .dot{width:8px;height:8px;border-radius:50%;background:#3f7a57;box-shadow:0 0 0 0 rgba(63,122,87,.6);animation:pulse 2s infinite}
+  .dot.stale{background:var(--gold);animation:none}
+  .dot.err{background:#c8503e;animation:none}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(63,122,87,.5)}70%{box-shadow:0 0 0 7px rgba(63,122,87,0)}100%{box-shadow:0 0 0 0 rgba(63,122,87,0)}}
+
+  /* ---------- main ---------- */
+  .main{padding:0;min-width:0}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;
+    padding:26px 34px 18px;border-bottom:1px solid var(--line);background:var(--paper);position:sticky;top:0;z-index:20}
+  .topbar h1{font-family:'Fraunces';font-weight:600;font-size:25px;margin:0;letter-spacing:-.3px}
+  .topbar .sub{color:var(--muted);font-size:12.5px;margin-top:3px}
+  .topactions{display:flex;align-items:center;gap:10px}
+  .btn{font-family:inherit;font-size:13px;font-weight:600;border-radius:10px;border:1px solid var(--line);
+    background:var(--panel);color:var(--ink);padding:9px 15px;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:7px}
+  .btn:hover{border-color:#cfcbbd;background:#fff}
+  .btn.primary{background:var(--green-800);border-color:var(--green-800);color:#fff}
+  .btn.primary:hover{background:var(--green-900)}
+  .btn:disabled{opacity:.55;cursor:default}
+
+  .content{padding:24px 34px 60px}
+
+  /* filters */
+  .filters{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 18px;display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;box-shadow:var(--shadow);margin-bottom:22px}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .field input,.field select{font-family:inherit;font-size:13.5px;padding:9px 11px;border:1px solid var(--line);
+    border-radius:9px;background:var(--panel-2);color:var(--ink);min-width:150px;cursor:pointer}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--green-500);background:#fff}
+  .presets{display:flex;gap:6px;margin-left:auto;align-items:center}
+  .chip{font-size:12px;font-weight:600;padding:7px 12px;border-radius:20px;border:1px solid var(--line);
+    background:var(--panel-2);cursor:pointer;color:var(--muted);transition:.15s}
+  .chip:hover{border-color:var(--green-500);color:var(--green-800)}
+  .chip.active{background:var(--green-800);border-color:var(--green-800);color:#fff}
+
+  /* kpi cards */
+  .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:22px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 16px 15px;
+    box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .kpi .cap{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.02em;display:flex;align-items:center;gap:7px}
+  .kpi .tag{width:9px;height:9px;border-radius:3px;display:inline-block}
+  .kpi .val{font-family:'Fraunces';font-size:34px;font-weight:600;line-height:1;margin-top:12px;letter-spacing:-.5px}
+  .kpi .meta{font-size:11.5px;color:var(--muted);margin-top:6px}
+  .kpi.is-danger .val{color:var(--danger)}
+
+  /* layout grid */
+  .grid{display:grid;gap:18px;margin-bottom:22px}
+  .grid.two{grid-template-columns:1.15fr 1fr}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+  .card h3{font-family:'Fraunces';font-weight:600;font-size:16px;margin:0;padding:16px 18px 0}
+  .card .hint{font-size:11.5px;color:var(--muted);padding:2px 18px 0}
+  .card .body{padding:14px 18px 18px}
+  .chartwrap{position:relative;height:260px}
+
+  /* funnel */
+  .funnel{display:flex;flex-direction:column;gap:9px;padding:14px 18px 18px}
+  .frow{display:grid;grid-template-columns:88px 1fr 64px;gap:12px;align-items:center}
+  .frow .lbl{font-weight:600;font-size:13px}
+  .frow .lbl small{display:block;color:var(--muted);font-weight:500;font-size:10.5px}
+  .track{height:26px;background:var(--panel-2);border-radius:7px;overflow:hidden;position:relative;border:1px solid var(--line)}
+  .fill{height:100%;background:linear-gradient(90deg,var(--green-600),var(--green-500));border-radius:7px 0 0 7px;
+    display:flex;align-items:center;justify-content:flex-end;padding-right:8px;color:#fff;font-size:11px;font-weight:700;
+    min-width:2px;transition:width .6s cubic-bezier(.2,.7,.3,1)}
+  .frow .pct{text-align:right;font-family:'Fraunces';font-weight:600;font-size:15px}
+
+  /* table */
+  .tabletop{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 18px 10px}
+  .tabletop h3{padding:0}
+  .search{font-family:inherit;font-size:13px;padding:8px 11px;border:1px solid var(--line);border-radius:9px;
+    background:var(--panel-2);min-width:200px}
+  .search:focus{outline:none;border-color:var(--green-500);background:#fff}
+  .tablescroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{background:var(--green-900);color:#eaf1ec;text-align:left;padding:11px 14px;font-weight:600;
+    font-size:11.5px;letter-spacing:.03em;white-space:nowrap;cursor:pointer;user-select:none;position:sticky;top:0}
+  thead th .arrow{opacity:.4;font-size:10px;margin-left:3px}
+  thead th.sorted .arrow{opacity:1}
+  tbody td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tbody tr:nth-child(even){background:var(--panel-2)}
+  tbody tr:hover{background:#f0f4f0}
+  td.center{text-align:center;font-variant-numeric:tabular-nums}
+  td.dept{font-weight:600}
+  .pill{display:inline-block;min-width:24px;text-align:center;padding:2px 9px;border-radius:20px;font-weight:600;font-size:12.5px}
+  .pill.ok{background:var(--green-200);color:var(--green-900)}
+  .pill.zero{background:#eceae1;color:#9aa097}
+  .pill.warn{background:var(--danger-soft);color:var(--danger)}
+  .pill.gold{background:var(--gold-soft);color:var(--gold)}
+  .names{color:var(--muted);font-size:12px;max-width:340px}
+  .has-note{position:relative;cursor:help;border-bottom:1px dashed var(--green-500)}
+  .tip{display:none;position:absolute;z-index:50;background:var(--green-950);color:#eaf1ec;padding:9px 12px;
+    border-radius:9px;font-size:12px;line-height:1.5;white-space:pre-line;max-width:260px;
+    box-shadow:0 8px 26px rgba(0,0,0,.25);bottom:130%;left:0}
+  .has-note:hover .tip{display:block}
+
+  /* states */
+  .center-msg{display:grid;place-items:center;min-height:60vh;text-align:center;padding:30px}
+  .center-msg .box{max-width:460px}
+  .center-msg h2{font-family:'Fraunces';font-weight:600}
+  .center-msg input{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;margin:10px 0}
+  .err-banner{background:var(--danger-soft);color:var(--danger);border:1px solid #e9b8ad;border-radius:10px;
+    padding:11px 15px;font-size:13px;font-weight:500;margin-bottom:18px;display:none}
+
+  .skeleton{background:linear-gradient(90deg,#eee 25%,#f6f6f2 50%,#eee 75%);background-size:200% 100%;
+    animation:sk 1.3s infinite;border-radius:6px;color:transparent!important}
+  @keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+  @media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.grid.two{grid-template-columns:1fr}}
+  @media(max-width:820px){.app{grid-template-columns:1fr}.sidebar{position:static;height:auto;flex-direction:row;flex-wrap:wrap}
+    .nav{display:flex;flex-wrap:wrap;gap:4px}.navlabel,.side-foot{display:none}.kpis{grid-template-columns:repeat(2,1fr)}
+    .topbar{flex-direction:column;align-items:flex-start}.content{padding:18px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">P</div>
+      <div><b>Probation</b><small>Lifecycle Tracker</small></div>
+    </div>
+    <div class="navlabel">Overview</div>
+    <nav class="nav">
+      <a class="active" data-scroll="kpiSection"><span class="ic">◧</span> Dashboard</a>
+      <a data-scroll="funnelSection"><span class="ic">⌽</span> Review Funnel</a>
+      <a data-scroll="deptSection"><span class="ic">☷</span> Departments</a>
+    </nav>
+    <div class="navlabel">Data</div>
+    <nav class="nav">
+      <a id="navRefresh"><span class="ic">↻</span> Sync now</a>
+      <a id="navReset"><span class="ic">⌫</span> Reset filters</a>
+      <a id="navConfig"><span class="ic">⚙</span> API settings</a>
+    </nav>
+    <div class="side-foot">
+      <div class="syncrow"><span class="dot" id="dot"></span><span id="syncTxt">Connecting…</span></div>
+      <div id="countTxt">—</div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1>90-Day Performance Review</h1>
+        <div class="sub" id="rangeSub">Employee onboarding &amp; probation tracker</div>
+      </div>
+      <div class="topactions">
+        <span class="num" id="todayChip" style="color:var(--muted);font-size:13px"></span>
+        <button class="btn" id="btnRefresh">↻ Refresh</button>
+      </div>
+    </div>
+
+    <!-- SETUP screen (shown if no API URL) -->
+    <div id="setup" class="center-msg" style="display:none">
+      <div class="box">
+        <h2>Connect your sheet</h2>
+        <p style="color:var(--muted)">Paste the Apps Script Web App URL (ends in <code>/exec</code>). Deploy <b>Code.gs</b> as a Web App — Execute as <b>Me</b>, access <b>Anyone</b>.</p>
+        <input id="apiInput" placeholder="https://script.google.com/macros/s/AKfycb.../exec" />
+        <button class="btn primary" id="apiSave" style="width:100%;justify-content:center">Connect</button>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="dash" class="content" style="display:none">
+      <div class="err-banner" id="errBanner"></div>
+
+      <!-- filters -->
+      <div class="filters" id="kpiSection">
+        <div class="field"><label>From date</label><input type="date" id="fFrom"></div>
+        <div class="field"><label>To date</label><input type="date" id="fTo"></div>
+        <div class="field"><label>Department</label><select id="fDept"></select></div>
+        <div class="field"><label>Checkpoint stage</label><select id="fStage"></select></div>
+        <div class="presets">
+          <span class="chip" data-preset="30">30d</span>
+          <span class="chip" data-preset="90">90d</span>
+          <span class="chip active" data-preset="all">All</span>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpis" id="kpis"></div>
+
+      <!-- charts -->
+      <div class="grid two">
+        <div class="card">
+          <h3>Review Status Breakdown</h3>
+          <div class="hint">Distribution for the selected checkpoint &amp; date range</div>
+          <div class="body"><div class="chartwrap"><canvas id="chartStatus"></canvas></div></div>
+        </div>
+        <div class="card">
+          <h3>Completion Rate by Department</h3>
+          <div class="hint">% of reviews completed per department</div>
+          <div class="body"><div class="chartwrap"><canvas id="chartDept"></canvas></div></div>
+        </div>
+      </div>
+
+      <!-- funnel -->
+      <div class="card" id="funnelSection" style="margin-bottom:22px">
+        <h3>Onboarding Review Funnel</h3>
+        <div class="hint">Completion across every checkpoint (uses the selected date range &amp; department)</div>
+        <div class="funnel" id="funnel"></div>
+      </div>
+
+      <!-- dept table -->
+      <div class="card" id="deptSection">
+        <div class="tabletop">
+          <h3>Department Completion Detail</h3>
+          <input class="search" id="tSearch" placeholder="Filter departments…">
+        </div>
+        <div class="tablescroll">
+          <table id="deptTable">
+            <thead><tr>
+              <th data-k="i">#</th>
+              <th data-k="dept">Department <span class="arrow">↕</span></th>
+              <th data-k="total" class="center">Total <span class="arrow">↕</span></th>
+              <th data-k="checkin" class="center">Checkin <span class="arrow">↕</span></th>
+              <th data-k="completed" class="center">Completed <span class="arrow">↕</span></th>
+              <th data-k="extended" class="center">Extended <span class="arrow">↕</span></th>
+              <th data-k="hrTat" class="center">HR&nbsp;TAT <span class="arrow">↕</span></th>
+              <th data-k="rmTat" class="center">RM&nbsp;TAT <span class="arrow">↕</span></th>
+              <th data-k="pending">Pending Employees</th>
+            </tr></thead>
+            <tbody id="deptBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG
+   Either hard-code your /exec URL below, or leave '' and the
+   dashboard will ask for it (saved in the browser).
+   ============================================================ */
+const API_URL = '';            // <- optional: paste your /exec URL here
+const POLL_MS = 30000;         // auto-refresh every 30s
+
+/* ---- your script's logic, mirrored exactly ---- */
+const MILESTONES = ['1stday','15thday','45thday','75thday','90thday'];
+const LABELS = {'1stday':'1st Day','15thday':'15th Day','45thday':'45th Day','75thday':'75th Day','90thday':'90th Day'};
+const OFFSET = {'1stday':1,'15thday':15,'45thday':45,'75thday':75,'90thday':90};
+const CHECKIN = {'1stday':['kpi not sent'],'15thday':['pending'],'45thday':['checkin done'],'75thday':['process initiated'],'90thday':[]};
+const COMPLETED = {'1stday':['kpi sent'],'15thday':['hrbp connect done'],'45thday':['completed'],'75thday':['process completed','extension'],'90thday':['completed','extended']};
+const RMTAT = {'1stday':[],'15thday':[],'45thday':['pending from rm'],'75thday':['pending from rm','pending from employee'],'90thday':['pending w/ rm','pending w/ hr']};
+const BUFFER = 5;
+
+/* ---- state ---- */
+let DATA = [];                 // employees from backend
+let sortKey = 'total', sortDir = -1;
+let stageCharts = {};
+const $ = s => document.querySelector(s);
+
+/* ---- helpers ---- */
+function getApi(){ return API_URL || localStorage.getItem('probation_api') || ''; }
+function dParse(s){ const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); }
+function dStr(dt){ return dt.toISOString().slice(0,10); }
+function addDays(dt,n){ const x=new Date(dt); x.setDate(x.getDate()+n); return x; }
+const fmt = new Intl.DateTimeFormat('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+
+/* ============================================================
+   AGGREGATION  (replicates updateCounts + getTatCounts)
+   ============================================================ */
+function aggregate(stage, fromD, toD, deptFilter){
+  const off = OFFSET[stage];
+  const today = new Date(); today.setHours(0,0,0,0);
+  const stats = {};
+
+  function ensure(d){
+    if(!stats[d]) stats[d]={dept:d,total:0,checkin:0,completed:0,extended:0,hrTat:0,rmTat:0,
+                            completedNames:[],pendingExt:[],pendingNorm:[]};
+    return stats[d];
+  }
+
+  DATA.forEach(e=>{
+    if(e.exit.toUpperCase()==='EXIT') return;
+    if(deptFilter!=='All Departments' && e.dept!==deptFilter) return;
+    const doj = dParse(e.doj);
+    const mDate = addDays(doj, off);
+    if(mDate < fromD || mDate > toD) return;
+
+    const s = ensure(e.dept);
+    s.total++;
+
+    const status = (e.m[stage]||'').toLowerCase();
+    if(CHECKIN[stage].includes(status)) s.checkin++;
+
+    const isCompleted = COMPLETED[stage].includes(status);
+    if(isCompleted){ s.completed++; s.completedNames.push(e.name); }
+
+    const col90 = (e.m['90thday']||'').toLowerCase();
+    if(col90==='extended'){ s.extended++; s.pendingExt.push(e.name); }
+    else if(!isCompleted){ s.pendingNorm.push(e.name); }
+  });
+
+  // TAT — separate pass, buffer of 5 days, only past-due rows
+  DATA.forEach(e=>{
+    if(e.exit.toUpperCase()==='EXIT') return;
+    if(deptFilter!=='All Departments' && e.dept!==deptFilter) return;
+    if(!stats[e.dept]) return;
+    const doj = dParse(e.doj);
+    const tatDate = addDays(doj, off+BUFFER);
+    if(tatDate < fromD || tatDate > toD) return;
+
+    const status = (e.m[stage]||'').toLowerCase();
+    const isCompleted = COMPLETED[stage].includes(status);
+    if(!isCompleted && tatDate < today) stats[e.dept].hrTat++;
+    if(RMTAT[stage].includes(status) && tatDate < today) stats[e.dept].rmTat++;
+  });
+
+  return Object.values(stats);
+}
+
+/* funnel — completion per stage, same filters */
+function funnelData(fromD, toD, deptFilter){
+  return MILESTONES.map(stage=>{
+    const off = OFFSET[stage];
+    let total=0, completed=0;
+    DATA.forEach(e=>{
+      if(e.exit.toUpperCase()==='EXIT') return;
+      if(deptFilter!=='All Departments' && e.dept!==deptFilter) return;
+      const mDate = addDays(dParse(e.doj), off);
+      if(mDate<fromD||mDate>toD) return;
+      total++;
+      if(COMPLETED[stage].includes((e.m[stage]||'').toLowerCase())) completed++;
+    });
+    return {stage,label:LABELS[stage],total,completed,
+            pending:total-completed,rate:total?completed/total*100:0};
+  });
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function currentFilters(){
+  return {
+    stage: $('#fStage').value,
+    from: dParse($('#fFrom').value),
+    to: dParse($('#fTo').value),
+    dept: $('#fDept').value
+  };
+}
+
+function render(){
+  const f = currentFilters();
+  const rows = aggregate(f.stage, f.from, f.to, f.dept);
+
+  // totals
+  const T = rows.reduce((a,r)=>({total:a.total+r.total,completed:a.completed+r.completed,
+    checkin:a.checkin+r.checkin,extended:a.extended+r.extended,hrTat:a.hrTat+r.hrTat,rmTat:a.rmTat+r.rmTat}),
+    {total:0,completed:0,checkin:0,extended:0,hrTat:0,rmTat:0});
+  const pending = T.total - T.completed;
+  const rate = T.total ? (T.completed/T.total*100) : 0;
+
+  $('#rangeSub').textContent = `${LABELS[f.stage]} checkpoint · ${fmt.format(f.from)} – ${fmt.format(f.to)}`
+    + (f.dept!=='All Departments' ? ` · ${f.dept}` : '');
+
+  // KPIs
+  const kpis = [
+    {cap:'Employees in Cycle',tag:'var(--green-900)',val:T.total,meta:`${rows.length} departments`},
+    {cap:'Reviews Completed',tag:'var(--green-500)',val:T.completed,meta:`${rate.toFixed(1)}% completion`},
+    {cap:'Reviews Pending',tag:'var(--gold)',val:pending,meta:'awaiting action'},
+    {cap:'Completion Rate',tag:'var(--green-600)',val:rate.toFixed(1)+'%',meta:`${T.completed} of ${T.total}`},
+    {cap:'RM Over TAT',tag:'var(--danger)',val:T.rmTat,danger:T.rmTat>0,meta:'manager overdue'},
+    {cap:'HR Over TAT',tag:'var(--danger)',val:T.hrTat,danger:T.hrTat>0,meta:'HR overdue'}
+  ];
+  $('#kpis').innerHTML = kpis.map(k=>`
+    <div class="kpi ${k.danger?'is-danger':''}">
+      <div class="cap"><span class="tag" style="background:${k.tag}"></span>${k.cap}</div>
+      <div class="val">${k.val}</div><div class="meta">${k.meta}</div>
+    </div>`).join('');
+
+  drawStatusChart(T, pending);
+  drawDeptChart(rows);
+  drawFunnel(f);
+  drawTable(rows);
+}
+
+function drawFunnel(f){
+  const fd = funnelData(f.from, f.to, f.dept);
+  $('#funnel').innerHTML = fd.map(s=>`
+    <div class="frow">
+      <div class="lbl">${s.label}<small>${s.completed}/${s.total} done</small></div>
+      <div class="track"><div class="fill" style="width:${s.rate.toFixed(1)}%">${s.rate>=12?Math.round(s.rate)+'%':''}</div></div>
+      <div class="pct">${s.total?s.rate.toFixed(1)+'%':'—'}</div>
+    </div>`).join('');
+}
+
+function drawTable(rows){
+  rows.sort((a,b)=>{
+    if(sortKey==='dept') return a.dept.localeCompare(b.dept)*sortDir;
+    if(sortKey==='pending') return ((b.pendingExt.length+b.pendingNorm.length)-(a.pendingExt.length+a.pendingNorm.length))*(-sortDir);
+    if(sortKey==='i') return 0;
+    return ((b[sortKey]||0)-(a[sortKey]||0))*(-sortDir);
+  });
+  const q = ($('#tSearch').value||'').toLowerCase();
+  const body = $('#deptBody');
+  body.innerHTML = rows.filter(r=>r.dept.toLowerCase().includes(q)).map((r,i)=>{
+    const names=[...r.pendingExt,...r.pendingNorm];
+    const pendingTxt = names.length?names.join(', '):'—';
+    const cPill = r.completed>0
+      ? `<span class="pill ok has-note">${r.completed}<span class="tip">Completed:\n${r.completedNames.join('\n')}</span></span>`
+      : `<span class="pill zero">0</span>`;
+    const pill=(v,cls='ok')=> v>0?`<span class="pill ${cls}">${v}</span>`:`<span class="pill zero">0</span>`;
+    return `<tr>
+      <td class="center">${i+1}</td>
+      <td class="dept">${r.dept||'—'}</td>
+      <td class="center">${r.total}</td>
+      <td class="center">${pill(r.checkin)}</td>
+      <td class="center">${cPill}</td>
+      <td class="center">${pill(r.extended,'gold')}</td>
+      <td class="center">${pill(r.hrTat,'warn')}</td>
+      <td class="center">${pill(r.rmTat,'warn')}</td>
+      <td class="names">${pendingTxt}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:30px">No employees match these filters.</td></tr>`;
+}
+
+/* ---- charts ---- */
+function baseFont(){ return {family:'Hanken Grotesk',size:12}; }
+function drawStatusChart(T,pending){
+  const ctx=$('#chartStatus');
+  const cfg={labels:['Completed','Pending','Extended','RM Over TAT','HR Over TAT'],
+    data:[T.completed,pending,T.extended,T.rmTat,T.hrTat],
+    colors:['#2f6b48','#b08531','#5b8f6f','#b23a2b','#d98c4a']};
+  if(stageCharts.status){stageCharts.status.data.labels=cfg.labels;
+    stageCharts.status.data.datasets[0].data=cfg.data;stageCharts.status.update();return;}
+  stageCharts.status=new Chart(ctx,{type:'bar',data:{labels:cfg.labels,
+    datasets:[{data:cfg.data,backgroundColor:cfg.colors,borderRadius:6,barThickness:26}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:'#eceae1'},ticks:{font:baseFont(),precision:0}},
+              y:{grid:{display:false},ticks:{font:baseFont()}}}}});
+}
+function drawDeptChart(rows){
+  const sorted=[...rows].sort((a,b)=>b.total-a.total).slice(0,10);
+  const labels=sorted.map(r=>r.dept||'—');
+  const data=sorted.map(r=>r.total?+(r.completed/r.total*100).toFixed(1):0);
+  if(stageCharts.dept){stageCharts.dept.data.labels=labels;
+    stageCharts.dept.data.datasets[0].data=data;stageCharts.dept.update();return;}
+  stageCharts.dept=new Chart($('#chartDept'),{type:'bar',data:{labels,
+    datasets:[{data,backgroundColor:'#1d3a2a',borderRadius:6,barThickness:22}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.x+'% complete'}}},
+      scales:{x:{max:100,grid:{color:'#eceae1'},ticks:{font:baseFont(),callback:v=>v+'%'}},
+              y:{grid:{display:false},ticks:{font:baseFont()}}}}});
+}
+
+/* ============================================================
+   DATA LOAD + AUTO REFRESH
+   ============================================================ */
+async function load(initial){
+  const url=getApi();
+  if(!url){ showSetup(); return; }
+  setSync('loading');
+  try{
+    const res=await fetch(url+(url.includes('?')?'&':'?')+'t='+Date.now());
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const json=await res.json();
+    if(!json.ok) throw new Error(json.error||'Backend error');
+    DATA=json.employees||[];
+    $('#errBanner').style.display='none';
+    if(initial) buildFilters(json);
+    render();
+    setSync('ok', json);
+  }catch(err){
+    setSync('err');
+    const b=$('#errBanner'); b.style.display='block';
+    b.textContent='Could not reach the sheet: '+err.message+'.  Check the Web App URL (must end in /exec) and that access = Anyone.';
+  }
+}
+
+function buildFilters(json){
+  // stage dropdown
+  $('#fStage').innerHTML=MILESTONES.map(m=>`<option value="${m}">${LABELS[m]}</option>`).join('');
+  $('#fStage').value='90thday';
+  // dept dropdown
+  const depts=[...new Set(DATA.map(e=>e.dept).filter(Boolean))].sort();
+  $('#fDept').innerHTML=`<option>All Departments</option>`+depts.map(d=>`<option>${d}</option>`).join('');
+  // default date range = full data span
+  applyPreset('all');
+}
+
+function dataSpan(){
+  let min=null,max=null;
+  DATA.forEach(e=>{
+    const d=dParse(e.doj);
+    const lo=addDays(d,OFFSET['1stday']), hi=addDays(d,OFFSET['90thday']);
+    if(!min||lo<min)min=lo; if(!max||hi>max)max=hi;
+  });
+  const today=new Date();
+  return {min:min||addDays(today,-120), max:max||addDays(today,120)};
+}
+function applyPreset(p){
+  const span=dataSpan(); const today=new Date();
+  if(p==='all'){ $('#fFrom').value=dStr(span.min); $('#fTo').value=dStr(span.max); }
+  else{ const n=+p; $('#fFrom').value=dStr(addDays(today,-n)); $('#fTo').value=dStr(addDays(today,30)); }
+  document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active',c.dataset.preset===p));
+}
+
+function setSync(state,json){
+  const dot=$('#dot'), txt=$('#syncTxt');
+  dot.className='dot'+(state==='err'?' err':state==='loading'?' stale':'');
+  if(state==='loading'){txt.textContent='Syncing…';}
+  else if(state==='err'){txt.textContent='Offline — retrying';}
+  else{
+    txt.textContent='Live · synced '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    if(json) $('#countTxt').textContent=json.count+' employees · '+json.timezone;
+  }
+}
+
+/* ---- setup screen ---- */
+function showSetup(){ $('#setup').style.display='grid'; $('#dash').style.display='none'; }
+function showDash(){ $('#setup').style.display='none'; $('#dash').style.display='block'; }
+
+/* ============================================================
+   WIRING
+   ============================================================ */
+function init(){
+  $('#todayChip').textContent=fmt.format(new Date());
+
+  // setup save
+  $('#apiSave').onclick=()=>{
+    const v=$('#apiInput').value.trim();
+    if(!/\/exec($|\?)/.test(v)){ alert('That URL should end in /exec'); return; }
+    localStorage.setItem('probation_api',v); showDash(); load(true);
+  };
+  $('#navConfig').onclick=()=>{ localStorage.removeItem('probation_api'); $('#apiInput').value=getApi(); showSetup(); };
+
+  // filter events
+  ['fStage','fDept','fFrom','fTo'].forEach(id=>$('#'+id).addEventListener('change',()=>{
+    if(['fFrom','fTo'].includes(id)) document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+    render();
+  }));
+  document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{applyPreset(c.dataset.preset);render();});
+  $('#tSearch').addEventListener('input',()=>drawTable(aggregate(currentFilters().stage,currentFilters().from,currentFilters().to,currentFilters().dept)));
+
+  // sorting
+  document.querySelectorAll('#deptTable thead th').forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k; if(k==='i')return;
+    if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=-1;}
+    document.querySelectorAll('#deptTable thead th').forEach(x=>x.classList.remove('sorted'));
+    th.classList.add('sorted');
+    drawTable(aggregate(currentFilters().stage,currentFilters().from,currentFilters().to,currentFilters().dept));
+  });
+
+  // refresh + nav
+  $('#btnRefresh').onclick=()=>load(false);
+  $('#navRefresh').onclick=()=>load(false);
+  $('#navReset').onclick=()=>{applyPreset('all');$('#fDept').value='All Departments';$('#fStage').value='90thday';render();};
+  document.querySelectorAll('[data-scroll]').forEach(a=>a.onclick=()=>{
+    document.querySelectorAll('.nav a').forEach(x=>x.classList.remove('active'));a.classList.add('active');
+    $('#'+a.dataset.scroll).scrollIntoView({behavior:'smooth',block:'start'});
+  });
+
+  if(getApi()) showDash(); else showSetup();
+  load(true);
+  setInterval(()=>{ if(getApi()) load(false); }, POLL_MS);
+}
+document.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>
