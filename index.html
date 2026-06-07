@@ -200,6 +200,7 @@
         <div class="menu" id="viewMenu">
           <a data-view="probation" class="active"><span class="mic">◆</span> Probation Dashboard</a>
           <a data-view="intern"><span class="mic">◆</span> Internship Dashboard</a>
+          <a data-view="cfr"><span class="mic">◆</span> CFR Dashboard</a>
         </div>
         <div class="sub" id="rangeSub">Employee onboarding &amp; probation tracker</div>
       </div>
@@ -278,7 +279,7 @@
             <span class="chip" data-d="90">90d</span><span class="chip active" data-d="all">All</span>
           </div>
         </div>
-        <div class="kpis" id="iKpis" style="grid-template-columns:repeat(6,1fr)"></div>
+        <div class="kpis" id="iKpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
         <div class="grid two">
           <div class="card"><h3>Review Status Breakdown</h3>
             <div class="hint">Distribution for the selected stage &amp; range</div>
@@ -292,15 +293,45 @@
             <input class="search" id="iSearch" placeholder="Filter stages…"></div>
           <div class="tablescroll"><table id="iTable"><thead><tr>
             <th>Stage</th><th class="center">Total</th><th class="center">Completed</th>
-            <th class="center">Not Started</th><th class="center">HR&nbsp;TAT</th>
+            <th class="center">Extended</th><th class="center">In&nbsp;Progress</th>
+            <th class="center">Not&nbsp;Started</th><th class="center">HR&nbsp;TAT</th>
             <th class="center">RM&nbsp;TAT</th><th class="center">NA</th>
-            <th class="center">Rate</th><th>Interns / Department</th>
+            <th class="center">Rate</th><th>Pending Interns / Dept</th>
           </tr></thead><tbody id="iBody"></tbody><tfoot id="iFoot"></tfoot></table></div>
         </div>
         <div class="card" style="margin-top:16px">
           <h3>Onboarding Review Funnel — by Duration</h3>
           <div class="hint">Completion across internship durations (uses selected range &amp; department)</div>
           <div class="funnel" id="iFunnel"></div>
+        </div>
+      </div>
+
+      <!-- ============ CFR VIEW ============ -->
+      <div id="viewCfr" style="display:none">
+        <div class="filters">
+          <div class="field"><label>Quarter</label><select id="cQuarter"></select></div>
+          <div class="field"><label>Department</label><select id="cDept"></select></div>
+          <div class="field"><label>Reporting Manager</label><select id="cRM"></select></div>
+          <div class="field"><label>Status</label><select id="cStatus"></select></div>
+        </div>
+        <div class="kpis" id="cKpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
+        <div class="grid two">
+          <div class="card"><h3>Status Breakdown</h3>
+            <div class="hint">CFR evaluation status across the selected filters</div>
+            <div class="body"><div class="chartwrap"><canvas id="cChartStatus"></canvas></div></div></div>
+          <div class="card"><h3>Completion Rate by Department</h3>
+            <div class="hint">% completed per department</div>
+            <div class="body"><div class="chartwrap"><canvas id="cChartDept"></canvas></div></div></div>
+        </div>
+        <div class="card">
+          <div class="tabletop"><h3>Status Breakdown by Department</h3>
+            <input class="search" id="cSearch" placeholder="Filter departments…"></div>
+          <div class="tablescroll"><table id="cTable"><thead><tr>
+            <th>Department</th><th class="center">Total</th><th class="center">Completed</th>
+            <th class="center">ME&nbsp;Pending</th><th class="center">SE&nbsp;Pending</th>
+            <th class="center">Init.&nbsp;Pending</th><th class="center">Completion&nbsp;%</th>
+            <th>Pending Employees</th>
+          </tr></thead><tbody id="cBody"></tbody><tfoot id="cFoot"></tfoot></table></div>
         </div>
       </div>
     </div>
@@ -325,8 +356,12 @@ const BUFFER = 5;
 const I_STAGES = [['8th Day',8],['30th Day',30],['45th Day',45],['60th Day',60],['75th Day',75],['90th Day',90],
   ['105th Day',105],['120th Day',120],['135th Day',135],['150th Day',150],['165th Day',165],['180th Day',180]];
 const I_HR = new Set(['meeting scheduled','peer feedback initiated','form shared','rm meeting scheduled']);
-const I_RM = new Set(['peer list received','peer received feedback']);
-const I_DONE = new Set(['meeting completed','form received','peer feedback completed','rm meeting completed','ppo offered','exit']);
+const I_RM = new Set(['peer list received','peer received feedback','peer feedback and form shared with rm']);
+const I_DONE = new Set(['meeting completed','form received','peer feedback completed','rm meeting completed','ppo offered','exit','extended']);
+const I_TAT_BUFFER = 5;
+function normStat(s){return String(s||'').toLowerCase().trim().replace(/\s+/g,' ');}
+function isExit(e){return normStat(e.status)==='exit';}
+function isExtendedIntern(e){return normStat(e.status)==='extended';}
 const OWNER_MATRIX = {
   '3 months':{'8th day':'EMP ↔ HR','30th day':'EMP ↔ HR','45th day':'RM ↔ HR','60th day':'EMP ↔ HR + RM','75th day':'RM ↔ HR','90th day':'RM ↔ HR'},
   '4 months':{'8th day':'EMP ↔ HR','45th day':'EMP ↔ HR','60th day':'RM ↔ HR','90th day':'EMP ↔ HR + RM','105th day':'RM ↔ HR','120th day':'RM ↔ HR'},
@@ -338,7 +373,8 @@ function normDur(s){ const n=parseInt(String(s).replace(/\D/g,''),10); return is
 
 /* ====================== STATE ====================== */
 let VIEW='probation';
-const CACHE={probation:null,intern:null};
+const CACHE={probation:null,intern:null,cfr:null};
+let cfrQuarter='', cfrQuarters=[];
 let pSort={k:'total',d:-1};
 const charts={};
 const $=s=>document.querySelector(s);
@@ -399,45 +435,59 @@ function pFunnelData(fromD,toD,deptFilter){
 }
 
 /* ====================== INTERN AGGREGATION ====================== */
-function iClassify(status,stageDate,today){
-  if(!status){return stageDate<today?'ns':'pending';}
-  const v=status.toLowerCase().trim();
-  if(v==='na'||v==='n/a')return 'na';
-  if(I_DONE.has(v))return 'done';
-  if(I_HR.has(v))return 'hr';
-  if(I_RM.has(v))return 'rm';
-  return 'ns';
+// returns {b: bucket, side, overdue, ext}
+//  buckets: done | na | inprog | ns | up(coming)
+function iClassify(rawStatus, intern, stageDate, today){
+  const v=normStat(rawStatus);
+  // whole-intern Extended, or a stage cell literally "Extended" -> counts as completed
+  if(isExtendedIntern(intern) || v==='extended') return {b:'done', ext:true};
+  if(!v) return {b: stageDate<today?'ns':'up'};
+  if(v==='na'||v==='n/a') return {b:'na'};
+  if(I_DONE.has(v)) return {b:'done'};
+  const overdue = addDays(stageDate, I_TAT_BUFFER) < today;   // >5 days past checkpoint
+  if(I_HR.has(v)) return {b:'inprog', side:'hr', overdue};
+  if(I_RM.has(v)) return {b:'inprog', side:'rm', overdue};
+  return {b: stageDate<today?'ns':'up', unmatched:true};      // dates / "pending" / unknown
 }
 function iAggregate(fromD,toD,deptFilter,durFilter){
   const data=CACHE.intern||[];const today=new Date();today.setHours(0,0,0,0);
   const rows=I_STAGES.map(([name,days])=>{
-    let total=0,done=0,ns=0,hr=0,rm=0,na=0;const interns=[];const deptCount={};
+    let total=0,done=0,ns=0,inprog=0,hrTat=0,rmTat=0,na=0,upcoming=0,extended=0;
+    const interns=[];
     data.forEach(e=>{
+      if(isExit(e))return;                                     // EXIT never shows
       if(deptFilter!=='All Departments'&&e.dept!==deptFilter)return;
       if(durFilter!=='All'&&normDur(e.duration)!==durFilter)return;
       const sd=addDays(dParse(e.doj),days);if(sd<fromD||sd>toD)return;
       total++;
-      const cls=iClassify(e.m[name],sd,today);
-      if(cls==='done')done++;else if(cls==='hr')hr++;else if(cls==='rm')rm++;
-      else if(cls==='na')na++;else ns++;
-      interns.push({name:e.name,dept:e.dept,owner:ownerOf(e.duration,name)});
-      deptCount[e.dept]=(deptCount[e.dept]||0)+1;
+      const c=iClassify(e.m[name],e,sd,today);
+      if(c.ext)extended++;
+      if(c.b==='done')done++;
+      else if(c.b==='na')na++;
+      else if(c.b==='inprog'){inprog++;if(c.overdue){if(c.side==='hr')hrTat++;else rmTat++;}}
+      else if(c.b==='up')upcoming++;
+      else ns++;
+      // name list excludes completed (and NA) interns
+      if(c.b!=='done'&&c.b!=='na')
+        interns.push({name:e.name,dept:e.dept,owner:ownerOf(e.duration,name)});
     });
-    return{stage:name,days,total,done,ns,hr,rm,na,rate:total?done/total*100:0,interns};
+    return{stage:name,days,total,done,ns,inprog,hrTat,rmTat,na,upcoming,extended,
+           rate:total?done/total*100:0,interns};
   });
   return rows;
 }
-function iFunnelData(fromD,toD,deptFilter){
+function iFunnelData(fromD,toD,deptFilter,durFilter){
   const data=CACHE.intern||[];const today=new Date();today.setHours(0,0,0,0);
   const durs=['3 months','4 months','5 months','6 months'];
   return durs.map(dur=>{
     let total=0,completed=0;
     data.forEach(e=>{
+      if(isExit(e))return;
       if(deptFilter!=='All Departments'&&e.dept!==deptFilter)return;
       if(normDur(e.duration)!==dur)return;
       I_STAGES.forEach(([name,days])=>{
         const sd=addDays(dParse(e.doj),days);if(sd<fromD||sd>toD)return;
-        total++;if(iClassify(e.m[name],sd,today)==='done')completed++;
+        total++;if(iClassify(e.m[name],e,sd,today).b==='done')completed++;
       });
     });
     return{label:dur.replace(' months',' Mo'),total,completed,pending:total-completed,rate:total?completed/total*100:0};
@@ -498,39 +548,42 @@ function renderIntern(){
   const f={from:dParse($('#iFrom').value),to:dParse($('#iTo').value),dept:$('#iDept').value,
     dur:$('#iDur').value,stage:$('#iStage').value};
   const rows=iAggregate(f.from,f.to,f.dept,f.dur);
-  const T=rows.reduce((a,r)=>({total:a.total+r.total,done:a.done+r.done,ns:a.ns+r.ns,hr:a.hr+r.hr,rm:a.rm+r.rm,na:a.na+r.na}),
-    {total:0,done:0,ns:0,hr:0,rm:0,na:0});
-  // active interns + ppo
-  const data=CACHE.intern||[];let active=0,ppo=0;
-  const seen=new Set();
+  const T=rows.reduce((a,r)=>({total:a.total+r.total,done:a.done+r.done,ns:a.ns+r.ns,inprog:a.inprog+r.inprog,
+    hrTat:a.hrTat+r.hrTat,rmTat:a.rmTat+r.rmTat,na:a.na+r.na,extended:a.extended+r.extended}),
+    {total:0,done:0,ns:0,inprog:0,hrTat:0,rmTat:0,na:0,extended:0});
+  // active interns (non-exit, incl extended) + ppo — from Internship Status column
+  const data=CACHE.intern||[];let active=0,extInterns=0,ppo=0;const seen=new Set();
   data.forEach(e=>{
+    if(isExit(e))return;                                       // EXIT excluded
     if(f.dept!=='All Departments'&&e.dept!==f.dept)return;
     if(f.dur!=='All'&&normDur(e.duration)!==f.dur)return;
-    const statuses=Object.values(e.m).map(x=>(x||'').toLowerCase());
-    const exited=statuses.includes('exit');
-    if(!exited&&!seen.has(e.name)){active++;seen.add(e.name);}
-    ppo+=statuses.filter(x=>x==='ppo offered').length;
+    if(!seen.has(e.name)){active++;seen.add(e.name);if(isExtendedIntern(e))extInterns++;}
+    ppo+=Object.values(e.m).map(normStat).filter(x=>x==='ppo offered').length;
   });
+  const pending=T.inprog+T.ns;
   const rate=T.total?T.done/T.total*100:0;
   $('#rangeSub').textContent=`Interns · ${fmt.format(f.from)} – ${fmt.format(f.to)}`+(f.dept!=='All Departments'?` · ${f.dept}`:'')+(f.dur!=='All'?` · ${f.dur}`:'');
   const kpis=[
     {cap:'Interns in Cycle',tag:'var(--green-900)',val:T.total,meta:'across stages'},
-    {cap:'Reviews Completed',tag:'var(--green-500)',val:T.done,meta:`${rate.toFixed(1)}% complete`},
-    {cap:'Reviews Pending',tag:'var(--gold)',val:T.ns,meta:'not started'},
+    {cap:'Reviews Completed',tag:'var(--green-500)',val:T.done,meta:`incl. ${T.extended} extended`},
+    {cap:'Reviews Pending',tag:'var(--gold)',val:pending,meta:`${T.inprog} in progress`},
     {cap:'Completion Rate',tag:'var(--green-600)',val:rate.toFixed(1)+'%',meta:`${T.done} of ${T.total}`},
+    {cap:'Extended',tag:'var(--purple)',val:extInterns,meta:'extension granted'},
     {cap:'PPO Shared',tag:'var(--blue)',val:ppo,meta:'offers made'},
-    {cap:'Total Active Interns',tag:'var(--green-600)',val:active,meta:'not exited'}];
+    {cap:'Total Active Interns',tag:'var(--green-600)',val:active,meta:'EXIT excluded'}];
   $('#iKpis').innerHTML=kpis.map(k=>`<div class="kpi">
     <div class="cap"><span class="tag" style="background:${k.tag}"></span>${k.cap}</div>
     <div class="val tnum">${k.val}</div><div class="meta">${k.meta}</div></div>`).join('');
   // status chart — selected stage or all
   let sc=T;
-  if(f.stage!=='All Stages'){const r=rows.find(x=>x.stage===f.stage)||{done:0,ns:0,hr:0,rm:0,na:0};sc={done:r.done,ns:r.ns,hr:r.hr,rm:r.rm,na:r.na};}
-  barChart('iChartStatus','istatus',['Completed','Not Started','HR TAT','RM TAT','NA'],
-    [sc.done,sc.ns,sc.hr,sc.rm,sc.na],['#2f6b48','#9a6f23','#1d4ed8','#b23a2b','#9aa097']);
-  // dept chart
-  const dc={};data.forEach(e=>{if(f.dur!=='All'&&normDur(e.duration)!==f.dur)return;
-    if(!Object.values(e.m).map(x=>(x||'').toLowerCase()).includes('exit'))dc[e.dept]=(dc[e.dept]||0)+1;});
+  if(f.stage!=='All Stages'){const r=rows.find(x=>x.stage===f.stage)||{done:0,ns:0,inprog:0,hrTat:0,rmTat:0,na:0};
+    sc={done:r.done,ns:r.ns,inprog:r.inprog,hrTat:r.hrTat,rmTat:r.rmTat,na:r.na};}
+  barChart('iChartStatus','istatus',['Completed','In Progress','Not Started','HR TAT','RM TAT','NA'],
+    [sc.done,sc.inprog,sc.ns,sc.hrTat,sc.rmTat,sc.na],['#2f6b48','#3f7a57','#9a6f23','#1d4ed8','#b23a2b','#9aa097']);
+  // dept chart — distinct non-exit interns per dept
+  const dc={};const dseen=new Set();
+  data.forEach(e=>{if(isExit(e))return;if(f.dur!=='All'&&normDur(e.duration)!==f.dur)return;
+    if(dseen.has(e.name))return;dseen.add(e.name);dc[e.dept]=(dc[e.dept]||0)+1;});
   const de=Object.entries(dc).sort((a,b)=>b[1]-a[1]).slice(0,10);
   barChart('iChartDept','idept',de.map(x=>x[0]||'—'),de.map(x=>x[1]),'#1d3a2a');
   iDrawTable(rows,f.stage);iDrawFunnel(f);
@@ -539,28 +592,94 @@ function iDrawTable(rows,stageFilter){
   const q=($('#iSearch').value||'').toLowerCase();
   let show=rows.filter(r=>r.stage.toLowerCase().includes(q));
   if(stageFilter&&stageFilter!=='All Stages')show=show.filter(r=>r.stage===stageFilter);
+  const pill=(v,cls)=>v>0?`<span class="pill ${cls}">${v}</span>`:`<span class="pill zero">0</span>`;
   $('#iBody').innerHTML=show.map(r=>{
-    const pill=(v,cls)=>v>0?`<span class="pill ${cls}">${v}</span>`:`<span class="pill zero">0</span>`;
     const cards=r.interns.slice(0,40).map(p=>{
       const cls=p.owner.includes('+')?'both':p.owner.includes('RM')?'rm':'hr';
       return `<span class="nm ${cls}" title="${p.owner}">${p.name} · ${p.dept||'—'}</span>`;}).join('');
     return`<tr><td class="lbl">${r.stage}</td><td class="center">${r.total}</td>
-      <td class="center">${pill(r.done,'ok')}</td><td class="center">${pill(r.ns,'gold')}</td>
-      <td class="center">${pill(r.hr,'warn')}</td><td class="center">${pill(r.rm,'warn')}</td>
+      <td class="center">${pill(r.done,'ok')}</td><td class="center">${pill(r.extended,'gold')}</td>
+      <td class="center">${pill(r.inprog,'na')}</td><td class="center">${pill(r.ns,'gold')}</td>
+      <td class="center">${pill(r.hrTat,'warn')}</td><td class="center">${pill(r.rmTat,'warn')}</td>
       <td class="center">${pill(r.na,'na')}</td><td class="center tnum">${r.rate.toFixed(1)}%</td>
       <td class="names">${cards||'—'}</td></tr>`;}).join('')
-    ||`<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">No stages match.</td></tr>`;
-  const T=show.reduce((a,r)=>({total:a.total+r.total,done:a.done+r.done,ns:a.ns+r.ns,hr:a.hr+r.hr,rm:a.rm+r.rm,na:a.na+r.na}),
-    {total:0,done:0,ns:0,hr:0,rm:0,na:0});
+    ||`<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:24px">No stages match.</td></tr>`;
+  const T=show.reduce((a,r)=>({total:a.total+r.total,done:a.done+r.done,extended:a.extended+r.extended,
+    inprog:a.inprog+r.inprog,ns:a.ns+r.ns,hrTat:a.hrTat+r.hrTat,rmTat:a.rmTat+r.rmTat,na:a.na+r.na}),
+    {total:0,done:0,extended:0,inprog:0,ns:0,hrTat:0,rmTat:0,na:0});
   $('#iFoot').innerHTML=`<tr><td>TOTAL</td><td class="center">${T.total}</td><td class="center">${T.done}</td>
-    <td class="center">${T.ns}</td><td class="center">${T.hr}</td><td class="center">${T.rm}</td>
-    <td class="center">${T.na}</td><td class="center">${T.total?(T.done/T.total*100).toFixed(1):'0.0'}%</td><td></td></tr>`;
+    <td class="center">${T.extended}</td><td class="center">${T.inprog}</td><td class="center">${T.ns}</td>
+    <td class="center">${T.hrTat}</td><td class="center">${T.rmTat}</td><td class="center">${T.na}</td>
+    <td class="center">${T.total?(T.done/T.total*100).toFixed(1):'0.0'}%</td><td></td></tr>`;
 }
 function iDrawFunnel(f){
-  $('#iFunnel').innerHTML=iFunnelData(f.from,f.to,f.dept).map(s=>`<div class="frow">
+  $('#iFunnel').innerHTML=iFunnelData(f.from,f.to,f.dept,f.dur).map(s=>`<div class="frow">
     <div class="lbl">${s.label}<small>${s.completed}/${s.total} done</small></div>
     <div class="track"><div class="fill" style="width:${s.rate.toFixed(1)}%">${s.rate>=14?Math.round(s.rate)+'%':''}</div></div>
     <div class="pct tnum">${s.total?s.rate.toFixed(1)+'%':'—'}</div></div>`).join('');
+}
+
+/* ====================== CFR LOGIC ====================== */
+// per formula: Completed='Completed'; ME Pending='ME Pending'+'HOLD' (+ME synonyms);
+// SE Pending='SE Pending' (+SE synonym); Init Pending=0 placeholder.
+const CFR_ME = new Set(['me pending','hold','manager feedback pending','pending from manager']);
+const CFR_SE = new Set(['se pending','pending from self']);
+function cfrAggregate(deptF,rmF,statusF){
+  const data=CACHE.cfr||[];const stats={};
+  data.forEach(e=>{
+    if(deptF!=='All Departments'&&e.dept!==deptF)return;
+    if(rmF!=='All RMs'&&e.rm!==rmF)return;
+    if(statusF!=='All Statuses'&&e.status!==statusF)return;
+    if(!stats[e.dept])stats[e.dept]={dept:e.dept,total:0,completed:0,me:0,se:0,init:0,pendingNames:[]};
+    const s=stats[e.dept];s.total++;
+    const v=normStat(e.status);
+    if(v==='completed')s.completed++;
+    else{
+      if(CFR_ME.has(v))s.me++; else if(CFR_SE.has(v))s.se++;
+      if(e.name)s.pendingNames.push(e.name);
+    }
+  });
+  return Object.values(stats);
+}
+function renderCFR(){
+  const f={dept:$('#cDept').value||'All Departments',rm:$('#cRM').value||'All RMs',status:$('#cStatus').value||'All Statuses'};
+  const rows=cfrAggregate(f.dept,f.rm,f.status);
+  const T=rows.reduce((a,r)=>({total:a.total+r.total,completed:a.completed+r.completed,me:a.me+r.me,se:a.se+r.se}),
+    {total:0,completed:0,me:0,se:0});
+  const rate=T.total?T.completed/T.total*100:0;
+  $('#rangeSub').textContent=`CFR · ${cfrQuarter||'—'}`+(f.dept!=='All Departments'?` · ${f.dept}`:'')+(f.rm!=='All RMs'?` · ${f.rm}`:'');
+  const kpis=[
+    {cap:'Total Records',tag:'var(--green-900)',val:T.total,meta:cfrQuarter||''},
+    {cap:'Completed',tag:'var(--green-500)',val:T.completed,meta:`${rate.toFixed(1)}% complete`},
+    {cap:'ME Pending',tag:'var(--gold)',val:T.me,meta:'manager eval pending'},
+    {cap:'SE Pending',tag:'var(--blue)',val:T.se,meta:'self eval pending'},
+    {cap:'Completion Rate',tag:'var(--green-600)',val:rate.toFixed(1)+'%',meta:`${T.completed} of ${T.total}`}];
+  $('#cKpis').innerHTML=kpis.map(k=>`<div class="kpi">
+    <div class="cap"><span class="tag" style="background:${k.tag}"></span>${k.cap}</div>
+    <div class="val tnum">${k.val}</div><div class="meta">${k.meta}</div></div>`).join('');
+  barChart('cChartStatus','cstatus',['Completed','ME Pending','SE Pending','Init. Pending'],
+    [T.completed,T.me,T.se,0],['#2f6b48','#9a6f23','#1d4ed8','#6d28d9']);
+  const ds=[...rows].sort((a,b)=>b.total-a.total).slice(0,12);
+  barChart('cChartDept','cdept',ds.map(r=>r.dept||'—'),ds.map(r=>r.total?+(r.completed/r.total*100).toFixed(1):0),'#1d3a2a',true);
+  cfrDrawTable(rows);
+}
+function cfrDrawTable(rows){
+  const q=($('#cSearch').value||'').toLowerCase();
+  const pill=(v,cls)=>v>0?`<span class="pill ${cls}">${v}</span>`:`<span class="pill zero">0</span>`;
+  let show=[...rows].filter(r=>r.dept.toLowerCase().includes(q)).sort((a,b)=>b.total-a.total);
+  $('#cBody').innerHTML=show.map((r,i)=>{
+    const rate=r.total?(r.completed/r.total*100):0;
+    return`<tr><td class="lbl">${r.dept||'—'}</td><td class="center">${r.total}</td>
+      <td class="center">${pill(r.completed,'ok')}</td><td class="center">${pill(r.me,'gold')}</td>
+      <td class="center">${pill(r.se,'warn')}</td><td class="center"><span class="pill zero">0</span></td>
+      <td class="center tnum">${rate.toFixed(1)}%</td>
+      <td class="names">${r.pendingNames.length?r.pendingNames.join(', '):'—'}</td></tr>`;}).join('')
+    ||`<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">No departments match.</td></tr>`;
+  const T=show.reduce((a,r)=>({total:a.total+r.total,completed:a.completed+r.completed,me:a.me+r.me,se:a.se+r.se}),
+    {total:0,completed:0,me:0,se:0});
+  $('#cFoot').innerHTML=`<tr><td>TOTAL</td><td class="center">${T.total}</td><td class="center">${T.completed}</td>
+    <td class="center">${T.me}</td><td class="center">${T.se}</td><td class="center">0</td>
+    <td class="center">${T.total?(T.completed/T.total*100).toFixed(1):'0.0'}%</td><td></td></tr>`;
 }
 
 /* ====================== CHART HELPER ====================== */
@@ -582,9 +701,12 @@ async function load(initial){
   if(!url){showErrNeedUrl();return;}
   setSync('loading');
   try{
-    const json=await jsonp(url+(url.includes('?')?'&':'?')+'view='+VIEW);
+    let q='';
+    if(VIEW==='cfr'&&cfrQuarter)q='&quarter='+encodeURIComponent(cfrQuarter);
+    const json=await jsonp(url+(url.includes('?')?'&':'?')+'view='+VIEW+q);
     if(!json.ok)throw new Error(json.error||'Backend error');
     CACHE[VIEW]=json.employees||[];
+    if(VIEW==='cfr'){cfrQuarters=json.quarters||[];cfrQuarter=json.quarter||cfrQuarter;}
     $('#errBanner').style.display='none';
     if(initial)buildFilters();
     renderCurrent();
@@ -604,7 +726,7 @@ function jsonp(url){
     s.src=url+sep+'callback='+cb+'&t='+Date.now();document.body.appendChild(s);
   });
 }
-function renderCurrent(){VIEW==='intern'?renderIntern():renderProbation();}
+function renderCurrent(){if(VIEW==='intern')renderIntern();else if(VIEW==='cfr')renderCFR();else renderProbation();}
 
 /* ====================== FILTERS ====================== */
 function buildFilters(){
@@ -615,6 +737,14 @@ function buildFilters(){
     const depts=[...new Set(data.map(e=>e.dept).filter(Boolean))].sort();
     $('#pDept').innerHTML=`<option>All Departments</option>`+depts.map(d=>`<option>${d}</option>`).join('');
     applyPreset('p','all');
+  }else if(VIEW==='cfr'){
+    $('#cQuarter').innerHTML=cfrQuarters.map(q=>`<option${q===cfrQuarter?' selected':''}>${q}</option>`).join('');
+    const depts=[...new Set(data.map(e=>e.dept).filter(Boolean))].sort();
+    $('#cDept').innerHTML=`<option>All Departments</option>`+depts.map(d=>`<option>${d}</option>`).join('');
+    const rms=[...new Set(data.map(e=>e.rm).filter(Boolean))].sort();
+    $('#cRM').innerHTML=`<option>All RMs</option>`+rms.map(r=>`<option>${r}</option>`).join('');
+    const sts=[...new Set(data.map(e=>e.status).filter(Boolean))].sort();
+    $('#cStatus').innerHTML=`<option>All Statuses</option>`+sts.map(s=>`<option>${s}</option>`).join('');
   }else{
     $('#iStage').innerHTML=`<option>All Stages</option>`+I_STAGES.map(([n])=>`<option value="${n}">${n}</option>`).join('');
     $('#iStage').value='All Stages';
@@ -658,10 +788,13 @@ function updateApiBarState(){const url=getApi(),bar=$('#apiBar');
 function switchView(v){
   if(v===VIEW){$('#viewMenu').classList.remove('open');return;}
   VIEW=v;
-  $('#viewTitle').textContent=v==='intern'?'Internship':'Probation';
-  $('#brandSub').textContent=v==='intern'?'Internship Tracker':'Probation Tracker';
+  const titles={probation:'Probation',intern:'Internship',cfr:'CFR'};
+  const subs={probation:'Probation Tracker',intern:'Internship Tracker',cfr:'CFR Tracker'};
+  $('#viewTitle').textContent=titles[v];
+  $('#brandSub').textContent=subs[v];
   $('#viewProbation').style.display=v==='probation'?'block':'none';
   $('#viewIntern').style.display=v==='intern'?'block':'none';
+  $('#viewCfr').style.display=v==='cfr'?'block':'none';
   document.querySelectorAll('#viewMenu a').forEach(a=>a.classList.toggle('active',a.dataset.view===v));
   $('#viewMenu').classList.remove('open');
   if(CACHE[v]){buildFilters();renderCurrent();load(false);}else{load(true);}
@@ -699,9 +832,15 @@ function init(){
   $('#iSearch').addEventListener('input',renderIntern);
   document.querySelectorAll('.presets[data-grp="i"] .chip').forEach(c=>c.onclick=()=>{applyPreset('i',c.dataset.d);renderIntern();});
 
+  // cfr filters — quarter change re-fetches (new tab); dept/rm/status are client-side
+  $('#cQuarter').addEventListener('change',()=>{cfrQuarter=$('#cQuarter').value;load(false);});
+  ['cDept','cRM','cStatus'].forEach(id=>$('#'+id).addEventListener('change',renderCFR));
+  $('#cSearch').addEventListener('input',renderCFR);
+
   // shared
   $('#btnRefresh').onclick=()=>load(false);$('#navRefresh').onclick=()=>load(false);
   $('#navReset').onclick=()=>{if(VIEW==='probation'){applyPreset('p','all');$('#pDept').value='All Departments';$('#pStage').value='90thday';renderProbation();}
+    else if(VIEW==='cfr'){$('#cDept').value='All Departments';$('#cRM').value='All RMs';$('#cStatus').value='All Statuses';renderCFR();}
     else{applyPreset('i','all');$('#iDept').value='All Departments';$('#iDur').value='All';$('#iStage').value='All Stages';renderIntern();}};
   document.querySelectorAll('[data-scroll]').forEach(a=>a.onclick=()=>{
     document.querySelectorAll('.nav a[data-scroll]').forEach(x=>x.classList.remove('active'));a.classList.add('active');
