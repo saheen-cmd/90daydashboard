@@ -213,7 +213,7 @@
           <div class="api-hint">Apps Script Web App deployment URI — HTTPS, terminating in <code>/exec</code>, executing as owner with public read access</div></div>
         </div>
         <div class="api-right">
-          <input id="apiInput" placeholder="https://script.google.com/macros/s/AKfycb…/exec" />
+          <input id="apiInput" readonly placeholder="https://script.google.com/macros/s/AKfycb…/exec" />
           <button class="btn primary" id="apiSave">Connect</button>
         </div>
       </div>
@@ -335,7 +335,7 @@
 
 <script>
 /* ====================== CONFIG ====================== */
-const API_URL = '';            // optional: hard-code your /exec URL
+const API_URL = 'https://script.google.com/macros/s/AKfycbyQ8h_X_5jMVbhNVxzA8KG4LioycWKKNVuUdUU3EeRZFBGgSncd045sKWBiOjVh4e4/exec';  // hard-coded /exec URL — loads for everyone
 const POLL_MS = 30000;
 
 /* ====================== PROBATION LOGIC ====================== */
@@ -805,7 +805,7 @@ function init(){
   $('#apiSave').onclick=()=>{const v=$('#apiInput').value.trim();
     if(!/\/exec($|\?)/.test(v)){alert('That URL should end in /exec');return;}
     localStorage.setItem('lifecycle_api',v);updateApiBarState();load(true);};
-  $('#navConfig').onclick=()=>{localStorage.removeItem('lifecycle_api');$('#apiInput').value='';updateApiBarState();};
+  $('#navConfig').onclick=()=>{$('#apiInput').value=getApi();updateApiBarState();load(false);};
 
   // view switcher — segmented buttons
   document.querySelectorAll('#viewSeg .seg').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
