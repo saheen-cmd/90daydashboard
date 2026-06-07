@@ -10,6 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root{
+    --ui-scale:0.85;   /* UI density: 0.80 = more compact, 1 = browser default */
     --paper:#f4f3ee; --panel:#ffffff; --panel-2:#fafaf7;
     --ink:#1c241f; --muted:#6c756d; --line:#e6e3da;
     --green-950:#10211800; --green-900:#15291d; --green-800:#1d3a2a;
@@ -23,14 +24,15 @@
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
-  body{zoom:0.85}
+  /* === UI density === edit --ui-scale in :root above. lower = more compact (image-1 look); 1 = browser default === */
+  body{zoom:var(--ui-scale)}
   body{font-family:'IBM Plex Sans',system-ui,Arial,sans-serif;background:var(--paper);
     color:var(--ink);-webkit-font-smoothing:antialiased;font-size:12.5px;line-height:1.4}
   .tnum{font-variant-numeric:tabular-nums}
 
   /* shell */
   .app{display:grid;grid-template-columns:200px 1fr;min-height:100vh}
-  .sidebar{background:#13241a;color:#cfdcd3;padding:18px 14px;position:sticky;top:0;height:100vh;
+  .sidebar{background:#13241a;color:#cfdcd3;padding:18px 14px;position:sticky;top:0;height:calc(100vh / var(--ui-scale));
     display:flex;flex-direction:column;gap:3px}
   .brand{display:flex;align-items:center;gap:9px;margin-bottom:22px;padding:2px 4px}
   .brand .logo{width:30px;height:30px;border-radius:7px;overflow:hidden;flex:0 0 auto;
