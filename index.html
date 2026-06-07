@@ -32,10 +32,12 @@
   .sidebar{background:#13241a;color:#cfdcd3;padding:18px 14px;position:sticky;top:0;height:100vh;
     display:flex;flex-direction:column;gap:3px}
   .brand{display:flex;align-items:center;gap:9px;margin-bottom:22px;padding:2px 4px}
-  .brand .logo{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,var(--green-500),var(--green-800));
-    display:grid;place-items:center;font-weight:700;color:#fff;font-size:14px}
-  .brand b{font-size:13.5px;color:#fff;font-weight:600}
-  .brand small{display:block;color:#7e9686;font-size:10px;margin-top:1px}
+  .brand .logo{width:30px;height:30px;border-radius:7px;overflow:hidden;flex:0 0 auto;
+    background:linear-gradient(135deg,var(--green-500),var(--green-800));
+    display:grid;place-items:center;font-weight:700;color:#fff;font-size:12px}
+  .brand .logo img{width:100%;height:100%;object-fit:cover;display:block}
+  .brand b{font-size:12.5px;color:#fff;font-weight:600;line-height:1.12;display:block}
+  .brand small{display:block;color:#7e9686;font-size:10px;margin-top:3px}
   .navlabel{font-size:9.5px;letter-spacing:.12em;color:#5f7568;text-transform:uppercase;margin:14px 6px 4px;font-weight:600}
   .nav a{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;color:#aebeb3;
     text-decoration:none;font-weight:500;cursor:pointer;transition:.12s;font-size:12.5px}
@@ -52,19 +54,12 @@
   .main{min-width:0}
   .topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;
     padding:16px 26px;border-bottom:1px solid var(--line);background:var(--paper);position:sticky;top:0;z-index:30}
-  .viewswitch{position:relative}
-  .viewBtn{font-family:inherit;font-size:18px;font-weight:600;letter-spacing:-.2px;background:none;border:none;
-    cursor:pointer;color:var(--ink);display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:8px}
-  .viewBtn:hover{background:#eceae1}
-  .viewBtn .caret{font-size:11px;color:var(--muted)}
-  .viewBtn .sub{font-size:11px;font-weight:400;color:var(--muted)}
-  .menu{position:absolute;top:110%;left:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;
-    box-shadow:0 8px 24px rgba(20,40,28,.12);padding:5px;min-width:200px;display:none;z-index:50}
-  .menu.open{display:block}
-  .menu a{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:7px;cursor:pointer;font-weight:500;color:var(--ink)}
-  .menu a:hover{background:var(--panel-2)}
-  .menu a.active{background:var(--green-800);color:#fff}
-  .menu a .mic{width:16px}
+  .viewswitch{display:flex;flex-direction:column;gap:5px}
+  .segmented{display:inline-flex;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px}
+  .seg{font-family:inherit;font-size:13px;font-weight:600;border:none;background:none;color:var(--muted);
+    cursor:pointer;padding:7px 16px;border-radius:7px;transition:.12s}
+  .seg:hover{color:var(--green-800)}
+  .seg.active{background:var(--green-800);color:#fff}
   .topactions{display:flex;align-items:center;gap:9px}
   .today{color:var(--muted);font-size:12px}
   .btn{font-family:inherit;font-size:12px;font-weight:600;border-radius:8px;border:1px solid var(--line);
@@ -155,10 +150,13 @@
   .pill.na{background:#eceae1;color:#7d847c}
   .names{color:var(--muted);font-size:11px;max-width:340px}
   .nm{display:inline-block;margin:1px 3px 1px 0;padding:1px 6px;border-radius:5px;font-size:10.5px;font-weight:500;border:1px solid var(--line)}
-  .nm.hr{border-left:2px solid var(--blue)}.nm.rm{border-left:2px solid var(--green-500)}.nm.both{border-left:2px solid var(--purple)}
+  .nm.ext{border-left:3px solid var(--gold);background:var(--gold-soft)}
+  .nm.pend{border-left:3px solid var(--blue)}
+  .nm .own{font-weight:600;color:var(--muted);font-size:9.5px;margin-left:3px}
+  .nm.ext .own{color:var(--gold)}
   .has-note{position:relative;cursor:help;border-bottom:1px dashed var(--green-500)}
   .tip{display:none;position:absolute;z-index:60;background:#13241a;color:#eaf1ec;padding:8px 11px;border-radius:8px;
-    font-size:11px;line-height:1.5;white-space:pre-line;max-width:240px;box-shadow:0 8px 24px rgba(0,0,0,.25);bottom:130%;left:0}
+    font-size:11px;line-height:1.5;white-space:pre-line;max-width:240px;box-shadow:0 8px 24px rgba(0,0,0,.25);top:130%;left:0}
   .has-note:hover .tip{display:block}
 
   .err-banner{background:var(--danger-soft);color:var(--danger);border:1px solid #e9b8ad;border-radius:8px;
@@ -172,7 +170,7 @@
 <body>
 <div class="app">
   <aside class="sidebar">
-    <div class="brand"><div class="logo">L</div><div><b>Lifecycle</b><small id="brandSub">Probation Tracker</small></div></div>
+    <div class="brand"><div class="logo"><img src="logo.png" alt="" onerror="this.remove();this.parentNode.textContent='EP';"></div><div><b class="brandname">Employee<br>Performance</b><small id="brandSub">Probation Tracker</small></div></div>
     <div class="navlabel">Overview</div>
     <nav class="nav">
       <a class="active" data-scroll="kpiAnchor"><span class="ic">▦</span> Dashboard</a>
@@ -194,13 +192,10 @@
   <main class="main">
     <div class="topbar">
       <div class="viewswitch">
-        <button class="viewBtn" id="viewBtn">
-          <span id="viewTitle">Probation</span><span class="caret">▾</span>
-        </button>
-        <div class="menu" id="viewMenu">
-          <a data-view="probation" class="active"><span class="mic">◆</span> Probation Dashboard</a>
-          <a data-view="intern"><span class="mic">◆</span> Internship Dashboard</a>
-          <a data-view="cfr"><span class="mic">◆</span> CFR Dashboard</a>
+        <div class="segmented" id="viewSeg">
+          <button class="seg active" data-view="probation">Probation</button>
+          <button class="seg" data-view="intern">Internship</button>
+          <button class="seg" data-view="cfr">CFR</button>
         </div>
         <div class="sub" id="rangeSub">Employee onboarding &amp; probation tracker</div>
       </div>
@@ -213,9 +208,9 @@
     <div class="content">
       <!-- API connection (shared) -->
       <div class="api-bar" id="apiBar">
-        <div class="api-left"><span style="font-size:18px">⚡</span>
-          <div><div class="api-title">Sheet Connection</div>
-          <div class="api-hint">Paste your Apps Script Web App URL (ends in <code>/exec</code>)</div></div>
+        <div class="api-left">
+          <div><div class="api-title">Data Source Endpoint</div>
+          <div class="api-hint">Apps Script Web App deployment URI — HTTPS, terminating in <code>/exec</code>, executing as owner with public read access</div></div>
         </div>
         <div class="api-right">
           <input id="apiInput" placeholder="https://script.google.com/macros/s/AKfycb…/exec" />
@@ -232,19 +227,11 @@
           <div class="field"><label>Department</label><select id="pDept"></select></div>
           <div class="field"><label>Checkpoint stage</label><select id="pStage"></select></div>
           <div class="presets" data-grp="p">
-            <span class="chip" data-d="12">12d</span><span class="chip" data-d="30">30d</span>
-            <span class="chip" data-d="90">90d</span><span class="chip active" data-d="all">All</span>
+            <span class="chip active" data-d="12">12d</span><span class="chip" data-d="30">30d</span>
+            <span class="chip" data-d="90">90d</span><span class="chip" data-d="all">All</span>
           </div>
         </div>
         <div class="kpis" id="pKpis" style="grid-template-columns:repeat(6,1fr)"></div>
-        <div class="grid two">
-          <div class="card"><h3>Review Status Breakdown</h3>
-            <div class="hint">Distribution for the selected checkpoint &amp; range</div>
-            <div class="body"><div class="chartwrap"><canvas id="pChartStatus"></canvas></div></div></div>
-          <div class="card"><h3>Completion Rate by Department</h3>
-            <div class="hint">% of reviews completed per department</div>
-            <div class="body"><div class="chartwrap"><canvas id="pChartDept"></canvas></div></div></div>
-        </div>
         <div class="card" id="tableAnchor">
           <div class="tabletop"><h3>Department Completion Detail</h3>
             <input class="search" id="pSearch" placeholder="Filter departments…"></div>
@@ -258,6 +245,14 @@
             <th data-k="rmTat" class="center">RM&nbsp;TAT <span class="arrow">↕</span></th>
             <th data-k="pending">Pending Employees</th>
           </tr></thead><tbody id="pBody"></tbody></table></div>
+        </div>
+        <div class="grid two" style="margin-top:16px">
+          <div class="card"><h3>Review Status Breakdown</h3>
+            <div class="hint">Distribution for the selected checkpoint &amp; range</div>
+            <div class="body"><div class="chartwrap"><canvas id="pChartStatus"></canvas></div></div></div>
+          <div class="card"><h3>Completion Rate by Department</h3>
+            <div class="hint">% of reviews completed per department</div>
+            <div class="body"><div class="chartwrap"><canvas id="pChartDept"></canvas></div></div></div>
         </div>
         <div class="card" id="funnelAnchor" style="margin-top:16px">
           <h3>Onboarding Review Funnel</h3>
@@ -275,19 +270,11 @@
           <div class="field"><label>Duration</label><select id="iDur"></select></div>
           <div class="field"><label>Checkpoint stage</label><select id="iStage"></select></div>
           <div class="presets" data-grp="i">
-            <span class="chip" data-d="12">12d</span><span class="chip" data-d="30">30d</span>
-            <span class="chip" data-d="90">90d</span><span class="chip active" data-d="all">All</span>
+            <span class="chip active" data-d="12">12d</span><span class="chip" data-d="30">30d</span>
+            <span class="chip" data-d="90">90d</span><span class="chip" data-d="all">All</span>
           </div>
         </div>
         <div class="kpis" id="iKpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
-        <div class="grid two">
-          <div class="card"><h3>Review Status Breakdown</h3>
-            <div class="hint">Distribution for the selected stage &amp; range</div>
-            <div class="body"><div class="chartwrap"><canvas id="iChartStatus"></canvas></div></div></div>
-          <div class="card"><h3>Interns by Department</h3>
-            <div class="hint">Active interns per department</div>
-            <div class="body"><div class="chartwrap"><canvas id="iChartDept"></canvas></div></div></div>
-        </div>
         <div class="card">
           <div class="tabletop"><h3>Completion Overview by Stage</h3>
             <input class="search" id="iSearch" placeholder="Filter stages…"></div>
@@ -298,6 +285,14 @@
             <th class="center">RM&nbsp;TAT</th><th class="center">NA</th>
             <th class="center">Rate</th><th>Pending Interns / Dept</th>
           </tr></thead><tbody id="iBody"></tbody><tfoot id="iFoot"></tfoot></table></div>
+        </div>
+        <div class="grid two" style="margin-top:16px">
+          <div class="card"><h3>Review Status Breakdown</h3>
+            <div class="hint">Distribution for the selected stage &amp; range</div>
+            <div class="body"><div class="chartwrap"><canvas id="iChartStatus"></canvas></div></div></div>
+          <div class="card"><h3>Interns by Department</h3>
+            <div class="hint">Active interns per department</div>
+            <div class="body"><div class="chartwrap"><canvas id="iChartDept"></canvas></div></div></div>
         </div>
         <div class="card" style="margin-top:16px">
           <h3>Onboarding Review Funnel — by Duration</h3>
@@ -453,7 +448,7 @@ function iAggregate(fromD,toD,deptFilter,durFilter){
   const data=CACHE.intern||[];const today=new Date();today.setHours(0,0,0,0);
   const rows=I_STAGES.map(([name,days])=>{
     let total=0,done=0,ns=0,inprog=0,hrTat=0,rmTat=0,na=0,upcoming=0,extended=0;
-    const interns=[];
+    const interns=[];const completedNames=[];
     data.forEach(e=>{
       if(isExit(e))return;                                     // EXIT never shows
       if(deptFilter!=='All Departments'&&e.dept!==deptFilter)return;
@@ -462,17 +457,19 @@ function iAggregate(fromD,toD,deptFilter,durFilter){
       total++;
       const c=iClassify(e.m[name],e,sd,today);
       if(c.ext)extended++;
-      if(c.b==='done')done++;
+      if(c.b==='done'){done++;completedNames.push(e.name);}     // includes extended
       else if(c.b==='na')na++;
       else if(c.b==='inprog'){inprog++;if(c.overdue){if(c.side==='hr')hrTat++;else rmTat++;}}
       else if(c.b==='up')upcoming++;
       else ns++;
-      // name list excludes completed (and NA) interns
-      if(c.b!=='done'&&c.b!=='na')
-        interns.push({name:e.name,dept:e.dept,owner:ownerOf(e.duration,name)});
+      // names: extended (yellow) + anything not plain-completed and not NA (blue)
+      if(c.ext)
+        interns.push({name:e.name,dept:e.dept,owner:ownerOf(e.duration,name),ext:true});
+      else if(c.b!=='done'&&c.b!=='na')
+        interns.push({name:e.name,dept:e.dept,owner:ownerOf(e.duration,name),ext:false});
     });
     return{stage:name,days,total,done,ns,inprog,hrTat,rmTat,na,upcoming,extended,
-           rate:total?done/total*100:0,interns};
+           rate:total?done/total*100:0,interns,completedNames};
   });
   return rows;
 }
@@ -594,11 +591,14 @@ function iDrawTable(rows,stageFilter){
   if(stageFilter&&stageFilter!=='All Stages')show=show.filter(r=>r.stage===stageFilter);
   const pill=(v,cls)=>v>0?`<span class="pill ${cls}">${v}</span>`:`<span class="pill zero">0</span>`;
   $('#iBody').innerHTML=show.map(r=>{
-    const cards=r.interns.slice(0,40).map(p=>{
-      const cls=p.owner.includes('+')?'both':p.owner.includes('RM')?'rm':'hr';
-      return `<span class="nm ${cls}" title="${p.owner}">${p.name} · ${p.dept||'—'}</span>`;}).join('');
+    const cards=r.interns.slice(0,60).map(p=>{
+      const cls=p.ext?'ext':'pend';
+      return `<span class="nm ${cls}">${p.name} · ${p.dept||'—'}<b class="own">${p.owner}</b></span>`;}).join('');
+    const cPill=r.done>0
+      ? `<span class="pill ok has-note">${r.done}<span class="tip">Completed:\n${r.completedNames.join('\n')}</span></span>`
+      : `<span class="pill zero">0</span>`;
     return`<tr><td class="lbl">${r.stage}</td><td class="center">${r.total}</td>
-      <td class="center">${pill(r.done,'ok')}</td><td class="center">${pill(r.extended,'gold')}</td>
+      <td class="center">${cPill}</td><td class="center">${pill(r.extended,'gold')}</td>
       <td class="center">${pill(r.inprog,'na')}</td><td class="center">${pill(r.ns,'gold')}</td>
       <td class="center">${pill(r.hrTat,'warn')}</td><td class="center">${pill(r.rmTat,'warn')}</td>
       <td class="center">${pill(r.na,'na')}</td><td class="center tnum">${r.rate.toFixed(1)}%</td>
@@ -736,7 +736,7 @@ function buildFilters(){
     $('#pStage').value='90thday';
     const depts=[...new Set(data.map(e=>e.dept).filter(Boolean))].sort();
     $('#pDept').innerHTML=`<option>All Departments</option>`+depts.map(d=>`<option>${d}</option>`).join('');
-    applyPreset('p','all');
+    applyPreset('p','12');
   }else if(VIEW==='cfr'){
     $('#cQuarter').innerHTML=cfrQuarters.map(q=>`<option${q===cfrQuarter?' selected':''}>${q}</option>`).join('');
     const depts=[...new Set(data.map(e=>e.dept).filter(Boolean))].sort();
@@ -752,7 +752,7 @@ function buildFilters(){
     $('#iDept').innerHTML=`<option>All Departments</option>`+depts.map(d=>`<option>${d}</option>`).join('');
     const durs=[...new Set(data.map(e=>normDur(e.duration)).filter(Boolean))].sort();
     $('#iDur').innerHTML=`<option>All</option>`+durs.map(d=>`<option>${d}</option>`).join('');
-    applyPreset('i','all');
+    applyPreset('i','12');
   }
 }
 function dataSpan(){
@@ -786,17 +786,14 @@ function updateApiBarState(){const url=getApi(),bar=$('#apiBar');
 
 /* ====================== VIEW SWITCH ====================== */
 function switchView(v){
-  if(v===VIEW){$('#viewMenu').classList.remove('open');return;}
+  if(v===VIEW)return;
   VIEW=v;
-  const titles={probation:'Probation',intern:'Internship',cfr:'CFR'};
   const subs={probation:'Probation Tracker',intern:'Internship Tracker',cfr:'CFR Tracker'};
-  $('#viewTitle').textContent=titles[v];
   $('#brandSub').textContent=subs[v];
   $('#viewProbation').style.display=v==='probation'?'block':'none';
   $('#viewIntern').style.display=v==='intern'?'block':'none';
   $('#viewCfr').style.display=v==='cfr'?'block':'none';
-  document.querySelectorAll('#viewMenu a').forEach(a=>a.classList.toggle('active',a.dataset.view===v));
-  $('#viewMenu').classList.remove('open');
+  document.querySelectorAll('#viewSeg .seg').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   if(CACHE[v]){buildFilters();renderCurrent();load(false);}else{load(true);}
 }
 
@@ -810,10 +807,8 @@ function init(){
     localStorage.setItem('lifecycle_api',v);updateApiBarState();load(true);};
   $('#navConfig').onclick=()=>{localStorage.removeItem('lifecycle_api');$('#apiInput').value='';updateApiBarState();};
 
-  // view switcher
-  $('#viewBtn').onclick=e=>{e.stopPropagation();$('#viewMenu').classList.toggle('open');};
-  document.querySelectorAll('#viewMenu a').forEach(a=>a.onclick=()=>switchView(a.dataset.view));
-  document.addEventListener('click',()=>$('#viewMenu').classList.remove('open'));
+  // view switcher — segmented buttons
+  document.querySelectorAll('#viewSeg .seg').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
 
   // probation filters
   ['pStage','pDept','pFrom','pTo'].forEach(id=>$('#'+id).addEventListener('change',()=>{
@@ -839,9 +834,9 @@ function init(){
 
   // shared
   $('#btnRefresh').onclick=()=>load(false);$('#navRefresh').onclick=()=>load(false);
-  $('#navReset').onclick=()=>{if(VIEW==='probation'){applyPreset('p','all');$('#pDept').value='All Departments';$('#pStage').value='90thday';renderProbation();}
+  $('#navReset').onclick=()=>{if(VIEW==='probation'){applyPreset('p','12');$('#pDept').value='All Departments';$('#pStage').value='90thday';renderProbation();}
     else if(VIEW==='cfr'){$('#cDept').value='All Departments';$('#cRM').value='All RMs';$('#cStatus').value='All Statuses';renderCFR();}
-    else{applyPreset('i','all');$('#iDept').value='All Departments';$('#iDur').value='All';$('#iStage').value='All Stages';renderIntern();}};
+    else{applyPreset('i','12');$('#iDept').value='All Departments';$('#iDur').value='All';$('#iStage').value='All Stages';renderIntern();}};
   document.querySelectorAll('[data-scroll]').forEach(a=>a.onclick=()=>{
     document.querySelectorAll('.nav a[data-scroll]').forEach(x=>x.classList.remove('active'));a.classList.add('active');
     const el=$('#'+a.dataset.scroll);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});});
